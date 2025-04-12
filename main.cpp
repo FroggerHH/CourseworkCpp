@@ -278,6 +278,11 @@ void runBinaryHeap() {
 }
 
 int main() {
+    setlocale(LC_ALL, "Russian");
+#ifdef WIN32
+    system("chcp 65001");
+#endif
+
     int choice;
     while (true) {
         cout << "Выберите структуру данных:" << endl;
