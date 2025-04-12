@@ -1,0 +1,197 @@
+name: CMake Cross-Platform Build and Release
+
+on:
+  push:
+    # Trigger on pushes to the master branch
+    branches: [ "master" ]
+    # Trigger on pushes of tags matching v*.*.* (e.g., v1.0.0, v1.2.3)
+    tags: [ 'v*.*.*' ]
+  pull_request:
+    branches: [ "master" ]
+
+env:
+  # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
+  BUILD_TYPE: Release
+  # Имя исполняемого файла больше не задается здесь жестко
+
+jobs:
+  build:
+    # Use a matrix strategy to build on multiple platforms
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, macos-latest, windows-latest ]
+
+    # Set the runner based on the matrix variable
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # --- НОВЫЙ ШАГ: Извлечение имени исполняемого файла ---
+      - name: Извлечь имя исполняемого файла из CMakeLists.txt
+        id: extract_name # ID шага для ссылки на его output
+        shell: bash
+        run: |
+          # Ищем строку с add_executable, исключаем комментарии, извлекаем первое слово после '('
+          # Используем awk: разделители - пробел или '(', ищем строку, печатаем 2-е поле
+          EXECUTABLE_NAME=$(grep -v '^\s*#' CMakeLists.txt | grep 'add_executable(' | head -n 1 | awk -F'[ (]' '/add_executable/{print $2}')
+          
+          if [[ -z "$EXECUTABLE_NAME" ]]; then
+            echo "::error::Не удалось извлечь имя исполняемого файла из CMakeLists.txt"
+            exit 1
+          fi
+          echo "Найдено имя исполняемого файла: $EXECUTABLE_NAME"
+          # Устанавливаем output для использования в других шагах
+          echo "exe_name=$EXECUTABLE_NAME" >> $GITHUB_OUTPUT
+
+      - name: Configure CMake
+        # Configure CMake in a 'build' subdirectory.
+        run: cmake -B ${{ github.workspace }}/build -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }}
+
+      - name: Build
+        # Build your program with the given configuration.
+        # The --config flag is necessary for multi-config generators (e.g., Visual Studio on Windows)
+        run: cmake --build ${{ github.workspace }}/build --config ${{ env.BUILD_TYPE }}
+
+      - name: Определить путь и имя исполняемого файла
+        id: executable_info
+        shell: bash
+        run: |
+          # Используем имя, извлеченное на шаге extract_name
+          EXECUTABLE_NAME="${{ steps.extract_name.outputs.exe_name }}"
+          
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            EXE_SUFFIX=".exe"
+            # Visual Studio often puts builds in a config subdir
+            EXE_PATH="${{ github.workspace }}/build/${{ env.BUILD_TYPE }}/${EXECUTABLE_NAME}${EXE_SUFFIX}"
+            # Check if it's directly in build dir (e.g., with Ninja generator)
+            if [[ ! -f "$EXE_PATH" ]]; then
+               EXE_PATH="${{ github.workspace }}/build/${EXECUTABLE_NAME}${EXE_SUFFIX}"
+            fi
+            # Check if it's in build/bin/Release
+            if [[ ! -f "$EXE_PATH" ]]; then
+               EXE_PATH="${{ github.workspace }}/build/bin/${{ env.BUILD_TYPE }}/${EXECUTABLE_NAME}${EXE_SUFFIX}"
+            fi
+             # Check if it's in build/bin
+            if [[ ! -f "$EXE_PATH" ]]; then
+               EXE_PATH="${{ github.workspace }}/build/bin/${EXECUTABLE_NAME}${EXE_SUFFIX}"
+            fi
+            ARTIFACT_NAME="${EXECUTABLE_NAME}-windows"
+          elif [[ "${{ runner.os }}" == "macOS" ]]; then
+            EXE_SUFFIX=""
+            EXE_PATH="${{ github.workspace }}/build/${EXECUTABLE_NAME}${EXE_SUFFIX}"
+             # Check if it's in build/bin
+            if [[ ! -f "$EXE_PATH" ]]; then
+               EXE_PATH="${{ github.workspace }}/build/bin/${EXECUTABLE_NAME}${EXE_SUFFIX}"
+            fi
+            ARTIFACT_NAME="${EXECUTABLE_NAME}-macos"
+          else # Linux
+            EXE_SUFFIX=""
+            EXE_PATH="${{ github.workspace }}/build/${EXECUTABLE_NAME}${EXE_SUFFIX}"
+             # Check if it's in build/bin
+            if [[ ! -f "$EXE_PATH" ]]; then
+               EXE_PATH="${{ github.workspace }}/build/bin/${EXECUTABLE_NAME}${EXE_SUFFIX}"
+            fi
+            ARTIFACT_NAME="${EXECUTABLE_NAME}-linux"
+          fi
+          echo "Calculated executable path: $EXE_PATH"
+          echo "Calculated artifact name: $ARTIFACT_NAME"
+          if [[ ! -f "$EXE_PATH" ]]; then
+             echo "::error::Исполняемый файл не найден по пути $EXE_PATH"
+             # Дополнительно покажем содержимое build для отладки
+             echo "Содержимое ${{ github.workspace }}/build:"
+             ls -R ${{ github.workspace }}/build
+             exit 1
+          fi
+          # Set outputs for other steps
+          echo "exe_path=$EXE_PATH" >> $GITHUB_OUTPUT
+          echo "artifact_name=$ARTIFACT_NAME" >> $GITHUB_OUTPUT
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          # Artifact name includes OS and executable name
+          name: ${{ steps.executable_info.outputs.artifact_name }}
+          # Path to the executable determined in the previous step
+          path: ${{ steps.executable_info.outputs.exe_path }}
+          retention-days: 5 # Optional: Adjust artifact retention
+
+  create_release:
+    # This job only runs when a tag starting with 'v' is pushed
+    if: startsWith(github.ref, 'refs/tags/v')
+    # This job depends on the build job completing successfully for all OS in the matrix
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Needed to create releases and upload assets
+
+    steps:
+      - name: Checkout repository # Нужен для доступа к CMakeLists.txt снова, если потребуется
+        uses: actions/checkout@v4
+
+      # --- НОВЫЙ ШАГ: Извлечение имени исполняемого файла (повторно для этого job) ---
+      # Или можно передать имя через артефакт/output из build job, но так проще
+      - name: Извлечь имя исполняемого файла из CMakeLists.txt (для релиза)
+        id: extract_name_release
+        shell: bash
+        run: |
+          EXECUTABLE_NAME=$(grep -v '^\s*#' CMakeLists.txt | grep 'add_executable(' | head -n 1 | awk -F'[ (]' '/add_executable/{print $2}')
+          if [[ -z "$EXECUTABLE_NAME" ]]; then
+            echo "::error::Не удалось извлечь имя исполняемого файла из CMakeLists.txt"
+            exit 1
+          fi
+          echo "Найдено имя исполняемого файла: $EXECUTABLE_NAME"
+          echo "exe_name=$EXECUTABLE_NAME" >> $GITHUB_OUTPUT
+
+      - name: Get Tag Name
+        id: get_tag
+        run: echo "TAG_NAME=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts # Download into an 'artifacts' directory
+
+      - name: List downloaded artifacts # For debugging
+        run: ls -R artifacts
+
+      - name: Переименовать артефакты для релиза
+        shell: bash
+        run: |
+          ARTIFACTS_DIR="artifacts"
+          EXE_NAME="${{ steps.extract_name_release.outputs.exe_name }}"
+          
+          echo "Переименование файлов..."
+          # Переименовываем Linux: artifacts/Name-linux/Name -> artifacts/Name-linux/Name-linux
+          mv "$ARTIFACTS_DIR/$EXE_NAME-linux/$EXE_NAME" "$ARTIFACTS_DIR/$EXE_NAME-linux/$EXE_NAME-linux" || echo "Предупреждение: Не удалось переименовать Linux артефакт."
+          
+          # Переименовываем macOS: artifacts/Name-macos/Name -> artifacts/Name-macos/Name-macos
+          mv "$ARTIFACTS_DIR/$EXE_NAME-macos/$EXE_NAME" "$ARTIFACTS_DIR/$EXE_NAME-macos/$EXE_NAME-macos" || echo "Предупреждение: Не удалось переименовать macOS артефакт."
+          
+          # Переименовываем Windows: artifacts/Name-windows.exe/Name.exe -> artifacts/Name-windows.exe/Name-windows.exe
+          mv "$ARTIFACTS_DIR/$EXE_NAME-windows/$EXE_NAME.exe" "$ARTIFACTS_DIR/$EXE_NAME-windows/$EXE_NAME-windows.exe" || echo "Предупреждение: Не удалось переименовать Windows артефакт."
+          
+          echo "Содержимое после переименования:"
+          ls -R $ARTIFACTS_DIR
+
+
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          # Use the tag name from the environment variable set earlier
+          tag_name: ${{ env.TAG_NAME }}
+          # Name the release based on the tag
+          name: Release ${{ env.TAG_NAME }}
+          # Optional: Add release notes here or leave it blank
+          # body: |
+          #   This release includes cross-platform builds for the course project.
+          draft: false
+          prerelease: false
+          # Upload all files from the subdirectories within 'artifacts'
+          # Используем извлеченное имя файла
+          files: |
+            artifacts/${{ steps.extract_name_release.outputs.exe_name }}-linux/${{ steps.extract_name_release.outputs.exe_name }}-linux
+            artifacts/${{ steps.extract_name_release.outputs.exe_name }}-macos/${{ steps.extract_name_release.outputs.exe_name }}-macos
+            artifacts/${{ steps.extract_name_release.outputs.exe_name }}-windows/${{ steps.extract_name_release.outputs.exe_name }}-windows.exe
