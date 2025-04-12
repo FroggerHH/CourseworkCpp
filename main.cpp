@@ -5,6 +5,9 @@
 #include <functional>
 #include <stdexcept>
 #include <limits>
+#ifdef WIN32
+#include <windows.h>
+#endif
 using namespace std;
 
 template<typename KeyType, typename ValueType, typename Hasher = hash<KeyType> >
@@ -278,9 +281,9 @@ void runBinaryHeap() {
 }
 
 int main() {
-    setlocale(LC_ALL, "Russian");
 #ifdef WIN32
-    system("chcp 65001");
+    SetConsoleOutputCP(CP_UTF8);
+    SetConsoleCP(CP_UTF8);
 #endif
 
     int choice;
