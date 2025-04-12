@@ -1,10 +1,8 @@
 ﻿#include <iostream>
 #include <vector>
 #include <list>
-#include <string>
-#include <functional>
-#include <stdexcept>
 #include <limits>
+#include <algorithm>
 using namespace std;
 
 template<typename KeyType, typename ValueType, typename Hasher = hash<KeyType> >
@@ -142,7 +140,7 @@ public:
     void insert(const T &value) {
         heap.push_back(value); // Добавляем в конец
         siftUp(heap.size() - 1); // Восстанавливаем свойство кучи просеиванием вверх
-        cout << "Элемент " << value << " добавлен. ";
+        cout << "Элемент " << value << " добавлен. " << endl;
     }
 
     // Просмотр максимального элемента (без удаления)
