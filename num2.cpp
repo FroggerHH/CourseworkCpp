@@ -4,35 +4,36 @@
 #include <string>
 #include <fstream>
 #include <sstream>
+using namespace std;
 
 class HashTable {
 private:
     struct HashNode {
-        std::string key;
-        std::string value;
+        string key;
+        string value;
     };
 
-    std::vector<std::list<HashNode> > table;
-    size_t tableSize;
-    size_t currentSize;
-    std::hash<std::string> hashFunction;
+    vector<list<HashNode>> table;
+    int tableSize;
+    int currentSize;
+    hash<string> hashFunction;
 
-    size_t getTableIndex(const std::string &key) const {
+    int getTableIndex(const string &key) const {
         return hashFunction(key) % tableSize;
     }
 
 public:
-    explicit HashTable(size_t initialSize = 101) : tableSize(initialSize), currentSize(0) {
+    explicit HashTable(int initialSize = 101) : tableSize(initialSize), currentSize(0) {
         if (tableSize == 0) tableSize = 101;
         table.resize(tableSize);
     }
 
     // Вставка (сообщение об обновлении убрано для тихой загрузки из файла)
-    void insert(const std::string &key, const std::string &value) {
-        size_t hashIndex = getTableIndex(key);
+    void insert(const string &key, const string &value) {
+        int hashIndex = getTableIndex(key);
         auto &chain = table[hashIndex];
 
-        for (auto &node: chain) {
+        for (HashNode &node: chain) {
             if (node.key == key) {
                 node.value = value; // Обновляем существующий
                 return;
@@ -44,9 +45,9 @@ public:
     }
 
     // Поиск
-    bool search(const std::string &key, std::string &foundValue) const {
-        size_t hashIndex = getTableIndex(key);
-        const auto &chain = table[hashIndex];
+    bool search(string &key, string &foundValue) {
+        int hashIndex = getTableIndex(key);
+        list<HashNode> &chain = table[hashIndex];
         for (const auto &node: chain) {
             if (node.key == key) {
                 foundValue = node.value;
@@ -57,24 +58,22 @@ public:
     }
 
     // Отображение (не требуется по Заданию 2, но оставляем)
-    void display() const {
-        std::cout << "--- Содержимое Хеш-таблицы ---" << std::endl;
-        for (size_t i = 0; i < table.size(); ++i) {
-            std::cout << "[" << i << "]: ";
-            if (table[i].empty()) {
-                std::cout << "(пусто)";
-            } else {
-                for (const auto &node: table[i]) {
-                    std::cout << "(" << node.key << ", " << node.value << ") -> ";
+    void display() {
+        cout << "--- Содержимое Хеш-таблицы ---" << endl;
+        for (int i = 0; i < table.size(); ++i) {
+            if (table[i].empty() == false) {
+                cout << "[" << i << "]: ";
+                for (HashNode &node: table[i]) {
+                    cout << "(" << node.key << ", " << node.value << ") -> ";
                 }
-                std::cout << "null";
+                cout << "null";
+                cout << endl;
             }
-            std::cout << std::endl;
         }
-        std::cout << "-----------------------------" << std::endl;
+        cout << "-----------------------------" << endl;
     }
 
-    size_t getSize() const {
+    int getSize() {
         return currentSize;
     }
 };
@@ -83,22 +82,23 @@ public:
 int main() {
     setlocale(LC_ALL, "ru_RU.UTF-8");
 #ifdef WIN32
-    system("chcp 65001");
+    system("chcp 65001"); // Для UTF-8 в консоли Windows
+    system("cls");
 #endif
-
+    
     HashTable phoneBook;
-    std::ifstream inputFile("phonebook.txt");
+    ifstream inputFile("phonebook.txt");
 
     if (!inputFile.is_open()) {
-        std::cerr << "Ошибка: Не удалось открыть файл phonebook.txt" << std::endl;
+        cerr << "Ошибка: Не удалось открыть файл phonebook.txt" << endl;
         return 1;
     }
 
-    std::string line, name, number;
+    string line, name, number;
     int linesRead = 0;
     // Читаем файл и заполняем хеш-таблицу
-    while (std::getline(inputFile, line)) {
-        std::stringstream ss(line);
+    while (getline(inputFile, line)) {
+        stringstream ss(line);
         // Простое чтение: первое слово - имя, второе - номер
         // Не обрабатывает имена или номера с пробелами!
         if (ss >> name >> number) {
@@ -106,35 +106,35 @@ int main() {
             linesRead++;
         } else if (!line.empty()) {
             // Игнорируем пустые строки
-            std::cerr << "Предупреждение: Некорректный формат строки в файле: " << line << std::endl;
+            cerr << "Предупреждение: Некорректный формат строки в файле: " << line << endl;
         }
     }
     inputFile.close();
 
     if (linesRead > 0) {
-        std::cout << "Телефонный справочник загружен. Записей: " << phoneBook.getSize() << std::endl;
+        cout << "Телефонный справочник загружен. Записей: " << phoneBook.getSize() << endl;
         phoneBook.display();
-    } else std::cout << "Телефонный справочник пуст или не удалось прочитать данные." << std::endl;
-    std::cout << "Введите имя для поиска (или 'exit' для выхода):" << std::endl;
+    } else cout << "Телефонный справочник пуст или не удалось прочитать данные." << endl;
+    cout << "Введите имя для поиска (или 'exit' для выхода):" << endl;
 
-    std::string searchName;
+    string searchName;
     while (true) {
-        std::cout << "> ";
-        if (!getline(std::cin, searchName)) {
-            std::cout << "Ошибка ввода." << std::endl;
-            std::cin.clear();
+        cout << "> ";
+        if (!getline(cin, searchName)) {
+            cout << "Ошибка ввода." << endl;
+            cin.clear();
             continue;
         }
 
         if (searchName == "exit") break;
 
-        std::string foundNumber;
+        string foundNumber;
 
         if (phoneBook.search(searchName, foundNumber))
-            std::cout << "Номер телефона: " << foundNumber << std::endl;
-        else std::cout << "Имя не найдено" << std::endl;
+            cout << "Номер телефона: " << foundNumber << endl;
+        else cout << "Имя не найдено" << endl;
     }
 
-    std::cout << "Завершение программы." << std::endl;
+    cout << "Завершение программы." << endl;
     return 0;
 }

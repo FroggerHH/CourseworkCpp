@@ -3,7 +3,7 @@ project(CourseworkCpp)
 
 set(CMAKE_CXX_STANDARD 17)
 
-add_executable(CourseworkCpp main.cpp)
+add_executable(CourseworkCpp num2.cpp)
 
 if(MSVC)
     # Указываем компилятору MSVC, что исходные файлы в кодировке UTF-8
