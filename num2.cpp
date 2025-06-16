@@ -13,42 +13,43 @@ private:
         string value;
     };
 
-    vector<list<HashNode>> table;
+    vector<list<HashNode> > table;
     int tableSize;
-    int currentSize;
     hash<string> hashFunction;
 
-    int getTableIndex(const string &key) const {
-        return hashFunction(key) % tableSize;
+    size_t getTableIndex(string &key) {
+        size_t hash = hashFunction(key);
+        hash = hash % tableSize;
+        return hash;
     }
 
 public:
-    explicit HashTable(int initialSize = 101) : tableSize(initialSize), currentSize(0) {
+    int size;
+
+    explicit HashTable(int initialSize = 101) : tableSize(initialSize), size(0) {
         if (tableSize == 0) tableSize = 101;
         table.resize(tableSize);
     }
 
-    // Вставка (сообщение об обновлении убрано для тихой загрузки из файла)
-    void insert(const string &key, const string &value) {
-        int hashIndex = getTableIndex(key);
-        auto &chain = table[hashIndex];
+    void insert(string &key, string &value) {
+        size_t hashIndex = getTableIndex(key);
+        list<HashNode> &chain = table[hashIndex];
 
         for (HashNode &node: chain) {
             if (node.key == key) {
-                node.value = value; // Обновляем существующий
+                node.value = value;
                 return;
             }
         }
-        // Добавляем новый
+
         chain.push_front({key, value});
-        currentSize++;
+        size++;
     }
 
-    // Поиск
     bool search(string &key, string &foundValue) {
-        int hashIndex = getTableIndex(key);
+        size_t hashIndex = getTableIndex(key);
         list<HashNode> &chain = table[hashIndex];
-        for (const auto &node: chain) {
+        for (HashNode &node: chain) {
             if (node.key == key) {
                 foundValue = node.value;
                 return true;
@@ -57,13 +58,14 @@ public:
         return false;
     }
 
-    // Отображение (не требуется по Заданию 2, но оставляем)
     void display() {
         cout << "--- Содержимое Хеш-таблицы ---" << endl;
-        for (int i = 0; i < table.size(); ++i) {
-            if (table[i].empty() == false) {
+        for (int i = 0; i < tableSize; ++i) {
+            list<HashNode> &chain = table[i];
+            bool isEmpty = chain.empty();
+            if (isEmpty == false) {
                 cout << "[" << i << "]: ";
-                for (HashNode &node: table[i]) {
+                for (HashNode &node: chain) {
                     cout << "(" << node.key << ", " << node.value << ") -> ";
                 }
                 cout << "null";
@@ -72,12 +74,25 @@ public:
         }
         cout << "-----------------------------" << endl;
     }
-
-    int getSize() {
-        return currentSize;
-    }
 };
 
+void loadFromFile(HashTable &phoneBook) {
+    ifstream inputFile("phonebook.txt");
+
+    string line, name, number;
+    int linesRead = 0;
+
+    while (getline(inputFile, line)) {
+        stringstream ss(line);
+        ss >> name >> number;
+
+        phoneBook.insert(name, number);
+        linesRead++;
+    }
+    inputFile.close();
+
+    phoneBook.display();
+}
 
 int main() {
     setlocale(LC_ALL, "ru_RU.UTF-8");
@@ -85,56 +100,26 @@ int main() {
     system("chcp 65001"); // Для UTF-8 в консоли Windows
     system("cls");
 #endif
-    
+
     HashTable phoneBook;
-    ifstream inputFile("phonebook.txt");
+    loadFromFile(phoneBook);
 
-    if (!inputFile.is_open()) {
-        cerr << "Ошибка: Не удалось открыть файл phonebook.txt" << endl;
-        return 1;
-    }
-
-    string line, name, number;
-    int linesRead = 0;
-    // Читаем файл и заполняем хеш-таблицу
-    while (getline(inputFile, line)) {
-        stringstream ss(line);
-        // Простое чтение: первое слово - имя, второе - номер
-        // Не обрабатывает имена или номера с пробелами!
-        if (ss >> name >> number) {
-            phoneBook.insert(name, number);
-            linesRead++;
-        } else if (!line.empty()) {
-            // Игнорируем пустые строки
-            cerr << "Предупреждение: Некорректный формат строки в файле: " << line << endl;
-        }
-    }
-    inputFile.close();
-
-    if (linesRead > 0) {
-        cout << "Телефонный справочник загружен. Записей: " << phoneBook.getSize() << endl;
-        phoneBook.display();
-    } else cout << "Телефонный справочник пуст или не удалось прочитать данные." << endl;
     cout << "Введите имя для поиска (или 'exit' для выхода):" << endl;
-
     string searchName;
     while (true) {
         cout << "> ";
-        if (!getline(cin, searchName)) {
-            cout << "Ошибка ввода." << endl;
-            cin.clear();
-            continue;
-        }
+        getline(cin, searchName);
 
         if (searchName == "exit") break;
 
         string foundNumber;
 
-        if (phoneBook.search(searchName, foundNumber))
+        bool isFound = phoneBook.search(searchName, foundNumber);
+        if (isFound)
             cout << "Номер телефона: " << foundNumber << endl;
         else cout << "Имя не найдено" << endl;
     }
 
-    cout << "Завершение программы." << endl;
+    cout << "Завершение программы" << endl;
     return 0;
 }
