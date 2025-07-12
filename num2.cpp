@@ -1,125 +1,99 @@
 ﻿#include <iostream>
 #include <vector>
-#include <list>
-#include <string>
-#include <fstream>
-#include <sstream>
-using namespace std;
+#include <clocale>
 
-class HashTable {
+class Graph {
 private:
-    struct HashNode {
-        string key;
-        string value;
-    };
+    int numVertices;
+    std::vector<std::vector<int> > adj; // Список смежности
+    std::vector<bool> visited; // Массив флагов посещения для DFS
 
-    vector<list<HashNode> > table;
-    int tableSize;
-    hash<string> hashFunction;
+    void dfs(int v, std::vector<int> &currentComponent) {
+        visited[v] = true;
+        currentComponent.push_back(v); // Добавляем вершину в текущую компоненту
 
-    size_t getTableIndex(string &key) {
-        size_t hash = hashFunction(key);
-        hash = hash % tableSize;
-        return hash;
+        for (int neighbor: adj[v]) {
+            if (!visited[neighbor]) {
+                dfs(neighbor, currentComponent);
+            }
+        }
     }
 
 public:
-    int size;
-
-    explicit HashTable(int initialSize = 101) : tableSize(initialSize), size(0) {
-        if (tableSize == 0) tableSize = 101;
-        table.resize(tableSize);
+    Graph(int V) : numVertices(V) {
+        adj.resize(numVertices);
     }
 
-    void insert(string &key, string &value) {
-        size_t hashIndex = getTableIndex(key);
-        list<HashNode> &chain = table[hashIndex];
-
-        for (HashNode &node: chain) {
-            if (node.key == key) {
-                node.value = value;
-                return;
-            }
+    void addEdge(int u, int v) {
+        if (u >= 0 && u < numVertices && v >= 0 && v < numVertices) {
+            adj[u].push_back(v);
+            adj[v].push_back(u); // Для неориентированного графа
+        } else {
+            std::cerr << "Ошибка: некорректные индексы вершин (" << u << ", " << v << ")." << std::endl;
         }
-
-        chain.push_front({key, value});
-        size++;
     }
 
-    bool search(string &key, string &foundValue) {
-        size_t hashIndex = getTableIndex(key);
-        list<HashNode> &chain = table[hashIndex];
-        for (HashNode &node: chain) {
-            if (node.key == key) {
-                foundValue = node.value;
-                return true;
-            }
-        }
-        return false;
-    }
+    std::vector<std::vector<int> > findAllConnectedComponents() {
+        std::vector<std::vector<int> > components; // Вектор для хранения всех компонент
+        visited.assign(numVertices, false); // Сброс всех вершин как непосещенных
 
-    void display() {
-        cout << "--- Содержимое Хеш-таблицы ---" << endl;
-        for (int i = 0; i < tableSize; ++i) {
-            list<HashNode> &chain = table[i];
-            bool isEmpty = chain.empty();
-            if (isEmpty == false) {
-                cout << "[" << i << "]: ";
-                for (HashNode &node: chain) {
-                    cout << "(" << node.key << ", " << node.value << ") -> ";
-                }
-                cout << "null";
-                cout << endl;
+        // Итерируемся по всем вершинам графа
+        for (int i = 0; i < numVertices; ++i) {
+            // Если вершина еще не посещена, это начало новой компоненты
+            if (!visited[i]) {
+                std::vector<int> currentComponent; // Вектор для текущей компоненты
+                dfs(i, currentComponent); // Запускаем DFS для сбора вершин компоненты
+                components.push_back(currentComponent); // Добавляем найденную компоненту
             }
         }
-        cout << "-----------------------------" << endl;
+        return components;
     }
 };
 
-void loadFromFile(HashTable &phoneBook) {
-    ifstream inputFile("phonebook.txt");
-
-    string line, name, number;
-    int linesRead = 0;
-
-    while (getline(inputFile, line)) {
-        stringstream ss(line);
-        ss >> name >> number;
-
-        phoneBook.insert(name, number);
-        linesRead++;
-    }
-    inputFile.close();
-
-    phoneBook.display();
-}
-
 int main() {
-    setlocale(LC_ALL, "ru_RU.UTF-8");
-#ifdef WIN32
-    system("chcp 65001"); // Для UTF-8 в консоли Windows
-    system("cls");
+#ifdef _WIN32
+    std::setlocale(LC_ALL, "ru_RU.UTF-8");
+    system("chcp 65001 > nul");
 #endif
 
-    HashTable phoneBook;
-    loadFromFile(phoneBook);
+    int N, M; // N - количество вершин, M - количество ребер
 
-    cout << "Введите имя для поиска (или 'exit' для выхода):" << endl;
-    string searchName;
-    while (true) {
-        cout << "> ";
-        getline(cin, searchName);
-
-        if (searchName == "exit") break;
-
-        string foundNumber;
-
-        bool isFound = phoneBook.search(searchName, foundNumber);
-        if (isFound)
-            cout << "Номер телефона: " << foundNumber << endl;
-        else cout << "Имя не найдено" << endl;
+    std::cout << "Введите количество вершин графа: ";
+    std::cin >> N;
+    if (N < 0) {
+        std::cerr << "Ошибка: количество вершин не может быть отрицательным." << std::endl;
+        return 1;
     }
 
-    cout << "Завершение программы" << endl;
+    Graph graph(N);
+
+    std::cout << "Введите количество ребер графа: ";
+    std::cin >> M;
+    if (M < 0) {
+        std::cerr << "Ошибка: количество ребер не может быть отрицательным." << std::endl;
+        return 1;
+    }
+
+    std::cout << "Введите " << M << " пар вершин (u v) для каждого ребра (вершины нумеруются с 0 до " << N - 1 << "):"
+            << std::endl;
+    for (int i = 0; i < M; ++i) {
+        int u, v;
+        std::cin >> u >> v;
+        graph.addEdge(u, v);
+    }
+
+    // Находим все компоненты связности
+    std::vector<std::vector<int> > components = graph.findAllConnectedComponents();
+
+    std::cout << "Найдено " << components.size() << " компонент связности:" << std::endl;
+    for (size_t i = 0; i < components.size(); ++i) {
+        std::cout << "Компонента " << i + 1 << ": ";
+        if (components[i].empty()) std::cout << "(пусто)";
+        else
+            for (size_t j = 0; j < components[i].size(); ++j)
+                std::cout << components[i][j] << (j == components[i].size() - 1 ? "" : " ");
+        std::cout << std::endl;
+    }
+
     return 0;
 }
