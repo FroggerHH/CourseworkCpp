@@ -4,164 +4,130 @@
 
 using namespace std;
 
-class BinaryHeap {
+class Graph {
 private:
-    vector<int> heap{};
+    int numVertices; // Количество вершин в графе
+    std::vector<std::vector<int> > adj; // Список смежности
+    std::vector<bool> visited; // Флаги посещения вершин для DFS
+    int countVisited; // Количество вершин, посещенных в текущем DFS
 
-    static int parent(int i) { return (i - 1) / 2; }
-    static int leftChild(int i) { return 2 * i + 1; }
-    static int rightChild(int i) { return 2 * i + 2; }
+    /**
+     * @brief Рекурсивная реализация алгоритма поиска в глубину (DFS).
+     *        Посещает все достижимые вершины из заданной, помечает их
+     *        как посещенные и увеличивает счетчик посещенных вершин.
+     * @param v Текущая вершина, с которой начинается обход.
+     */
+    void dfsRecursive(int v) {
+        visited[v] = true; // Помечаем текущую вершину как посещенную
+        countVisited++; // Увеличиваем счетчик посещенных вершин
 
-    // Просеивание вверх
-    void siftUp(int i) {
-        // Пока не дошли до корня и текущий элемент БОЛЬШЕ родителя
-        while (i > 0) {
-            int el = heap[i];
-            int p = heap[parent(i)];
-            if (el > p) {
-                swap(heap[i], heap[parent(i)]);
-                i = parent(i); // Переходим на позицию родителя}
-            } else break;
-        }
-    }
-
-    // Просеивание вниз
-    void siftDown(int i) {
-        int maxIndex = i; // Индекс наибольшего элемента (сначала текущий)
-
-        int leftIndex = leftChild(i);
-
-        int size = heap.size();
-        // Если левый потомок существует и он БОЛЬШЕ текущего максимума
-        if (leftIndex < size && heap[leftIndex] > heap[maxIndex]) maxIndex = leftIndex;
-
-        int rightIndex = rightChild(i);
-        // Если правый потомок существует и он БОЛЬШЕ текущего максимума
-        if (rightIndex < size && heap[rightIndex] > heap[maxIndex]) maxIndex = rightIndex;
-
-        // Если наибольший элемент не текущий, меняем и продолжаем просеивание
-        if (i != maxIndex) {
-            swap(heap[i], heap[maxIndex]);
-            siftDown(maxIndex); // Рекурсивно для новой позиции
+        // Проходим по всем смежным вершинам
+        for (int neighbor: adj[v]) {
+            // Если соседняя вершина еще не посещена, рекурсивно запускаем DFS от нее
+            if (!visited[neighbor]) {
+                dfsRecursive(neighbor);
+            }
         }
     }
 
 public:
-    BinaryHeap() = default;
-
-    int getSize() {
-        int size = heap.size();
-        return size;
+    /**
+     * @brief Конструктор класса Graph.
+     *        Инициализирует граф с заданным количеством вершин.
+     * @param V Количество вершин.
+     */
+    Graph(int V) : numVertices(V) {
+        // Инициализируем список смежности для каждой вершины
+        adj.resize(numVertices);
     }
 
-    bool isEmpty() {
-        bool isEmpty = heap.empty();
-        return isEmpty;
-    }
-
-    void insert(int value) {
-        heap.push_back(value); // Добавляем в конец
-        siftUp(heap.size() - 1); // Восстанавливаем свойство кучи просеиванием вверх
-        cout << "Элемент " << value << " добавлен. " << endl;
-    }
-
-    // Просмотр максимального элемента (без удаления)
-    int peekMax() {
-        bool flag = isEmpty();
-        if (flag) {
-            cout << "Куча пуста (peekMax)" << endl;
-            return -1;
+    /**
+     * @brief Добавляет неориентированное ребро между двумя вершинами.
+     *        Добавляет v в список смежности u, и u в список смежности v.
+     * @param u Первая вершина ребра.
+     * @param v Вторая вершина ребра.
+     */
+    void addEdge(int u, int v) {
+        // Проверка на корректность индексов вершин
+        if (u >= 0 && u < numVertices && v >= 0 && v < numVertices) {
+            adj[u].push_back(v);
+            adj[v].push_back(u); // Для неориентированного графа
+        } else {
+            std::cerr << "Ошибка: некорректные индексы вершин для добавления ребра ("
+                    << u << ", " << v << ")." << std::endl;
         }
-        int result = heap[0];
-        return result; // Максимальный элемент всегда в корне
     }
 
-    // Извлечение максимального элемента
-    int extractMax() {
-        bool flag = isEmpty();
-        if (flag) {
-            cout << "Куча пуста (extractMax)" << endl;
-            return -1;
+    /**
+     * @brief Проверяет, является ли граф связным.
+     *        Запускает DFS из вершины 0 и сравнивает количество
+     *        посещенных вершин с общим количеством вершин в графе.
+     * @return true, если граф связный, false в противном случае.
+     */
+    bool checkConnectivity() {
+        // Если граф пустой или состоит из одной вершины (без ребер), он считается связным
+        if (numVertices <= 1) {
+            return true;
         }
-        int result = heap[0]; // Запоминаем максимальный элемент
 
-        // Перемещаем последний элемент в корень
-        int back = heap.back();
-        heap[0] = back;
-        heap.pop_back(); // Удаляем последний элемент
+        // Инициализируем массив посещенных вершин и счетчик для нового обхода
+        visited.assign(numVertices, false);
+        countVisited = 0;
 
-        // Если куча не пуста, восстанавливаем свойство просеиванием вниз
-        flag = isEmpty();
-        if (!flag) siftDown(0);
-        return result;
-    }
+        // Запускаем DFS из первой вершины (с индексом 0)
+        dfsRecursive(0);
 
-    void displayState() {
-        cout << "Куча: [";
-        bool flag = isEmpty();
-        if (flag) cout << "(пусто)";
-        else {
-            int size = getSize();
-            for (int i = 0; i < size; ++i) {
-                int el = heap[i];
-                cout << el << " ";
-            }
-        }
-        cout << "]" << endl;
+        // Граф связный, если все вершины были посещены
+        return countVisited == numVertices;
     }
 };
-
-void clearInputBuffer() {
-    long long max = numeric_limits<streamsize>::max();
-    cin.ignore(max, '\n');
-}
-
-// Интерфейс двоичной кучи
-void runBinaryHeap() {
-    BinaryHeap binary_heap{};
-
-    cout << "\n--- Меню Двоичной кучи (Max-Heap) ---" << endl;
-    cout << "Команды: insert <value>, extractMax, peekMax, display, size, back" << endl;
-
-    while (true) {
-        cout << "MaxHeap> ";
-        string command;
-        cin >> command;
-
-        if (command == "insert") {
-            int value;
-            cin >> value;
-            binary_heap.insert(value);
-        } else if (command == "extractMax") {
-            int result = binary_heap.extractMax();
-            if (result != -1)
-                cout << "Извлечен максимальный элемент: " << result << ". " << endl;
-        } else if (command == "peekMax") {
-            int result = binary_heap.peekMax();
-            if (result != -1)
-                cout << "Максимальный элемент: " << result << endl;
-        } else if (command == "display") binary_heap.displayState();
-
-        else if (command == "size") {
-            int size = binary_heap.getSize();
-            cout << "Текущий размер кучи: " << size << endl;
-        } else if (command == "back") break; // Выход из меню
-
-        else {
-            cout << "Неизвестная команда." << endl;
-            clearInputBuffer();
-        }
-    }
-}
 
 int main() {
     setlocale(LC_ALL, "ru_RU.UTF-8");
 #ifdef WIN32
     system("chcp 65001"); // Для UTF-8 в консоли Windows
-    system("cls");
+    // system("cls");
 #endif
 
-    runBinaryHeap();
+    int N, M; // N - количество вершин, M - количество ребер
+
+    std::cout << "Введите количество вершин графа: ";
+    std::cin >> N;
+
+    // Проверка на корректность ввода количества вершин
+    if (N < 0) {
+        std::cerr << "Ошибка: количество вершин не может быть отрицательным."
+                << std::endl;
+        return 1;
+    }
+
+    Graph graph(N); // Создаем объект графа
+
+    std::cout << "Введите количество ребер графа: ";
+    std::cin >> M;
+
+    // Проверка на корректность ввода количества ребер
+    if (M < 0) {
+        std::cerr << "Ошибка: количество ребер не может быть отрицательным."
+                << std::endl;
+        return 1;
+    }
+
+    std::cout << "Введите " << M
+            << " пар вершин (u v) для каждого ребра (вершины нумеруются с 0 до "
+            << N - 1 << "):" << std::endl;
+    for (int i = 0; i < M; ++i) {
+        int u, v;
+        std::cin >> u >> v;
+        graph.addEdge(u, v);
+    }
+
+    // Проверяем связность графа и выводим результат
+    if (graph.checkConnectivity()) {
+        std::cout << "Граф является связным." << std::endl;
+    } else {
+        std::cout << "Граф не является связным." << std::endl;
+    }
 
     return 0;
 }
