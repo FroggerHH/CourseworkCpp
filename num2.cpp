@@ -5,45 +5,42 @@
 class Graph {
 private:
     int numVertices;
-    std::vector<std::vector<int> > adj; // Список смежности
+    std::vector<std::vector<int>> adj; // Список смежности
     std::vector<bool> visited; // Массив флагов посещения для DFS
 
     void dfs(int v, std::vector<int> &currentComponent) {
         visited[v] = true;
         currentComponent.push_back(v); // Добавляем вершину в текущую компоненту
 
-        for (int neighbor: adj[v]) {
-            if (!visited[neighbor]) {
-                dfs(neighbor, currentComponent);
-            }
+        int size = adj[v].size();
+        for (int i = 0; i < size; i++) {
+            int neighbor = adj[v][i];
+            bool isVisited = visited[neighbor];
+            if (!isVisited) dfs(neighbor, currentComponent);
         }
     }
 
 public:
-    Graph(int V) : numVertices(V) {
-        adj.resize(numVertices);
-    }
+    Graph(int V) : numVertices(V) { adj.resize(numVertices); }
 
     void addEdge(int u, int v) {
         if (u >= 0 && u < numVertices && v >= 0 && v < numVertices) {
             adj[u].push_back(v);
-            adj[v].push_back(u); // Для неориентированного графа
-        } else {
-            std::cerr << "Ошибка: некорректные индексы вершин (" << u << ", " << v << ")." << std::endl;
+            adj[v].push_back(u);
         }
     }
 
     std::vector<std::vector<int> > findAllConnectedComponents() {
-        std::vector<std::vector<int> > components; // Вектор для хранения всех компонент
+        std::vector<std::vector<int> > components;
         visited.assign(numVertices, false); // Сброс всех вершин как непосещенных
 
-        // Итерируемся по всем вершинам графа
-        for (int i = 0; i < numVertices; ++i) {
+        for (int i = 0; i < numVertices; i++) {
             // Если вершина еще не посещена, это начало новой компоненты
-            if (!visited[i]) {
-                std::vector<int> currentComponent; // Вектор для текущей компоненты
-                dfs(i, currentComponent); // Запускаем DFS для сбора вершин компоненты
-                components.push_back(currentComponent); // Добавляем найденную компоненту
+            bool isVisited = visited[i];
+            if (!isVisited) {
+                std::vector<int> current;
+                dfs(i, current);
+                components.push_back(current); // Добавляем найденную компоненту
             }
         }
         return components;
@@ -51,28 +48,16 @@ public:
 };
 
 int main() {
-#ifdef _WIN32
     std::setlocale(LC_ALL, "ru_RU.UTF-8");
-    system("chcp 65001 > nul");
-#endif
 
     int N, M; // N - количество вершин, M - количество ребер
 
     std::cout << "Введите количество вершин графа: ";
     std::cin >> N;
-    if (N < 0) {
-        std::cerr << "Ошибка: количество вершин не может быть отрицательным." << std::endl;
-        return 1;
-    }
-
-    Graph graph(N);
-
     std::cout << "Введите количество ребер графа: ";
     std::cin >> M;
-    if (M < 0) {
-        std::cerr << "Ошибка: количество ребер не может быть отрицательным." << std::endl;
-        return 1;
-    }
+
+    Graph graph(N);
 
     std::cout << "Введите " << M << " пар вершин (u v) для каждого ребра (вершины нумеруются с 0 до " << N - 1 << "):"
             << std::endl;
@@ -83,15 +68,19 @@ int main() {
     }
 
     // Находим все компоненты связности
-    std::vector<std::vector<int> > components = graph.findAllConnectedComponents();
+    std::vector<std::vector<int>> components = graph.findAllConnectedComponents();
 
-    std::cout << "Найдено " << components.size() << " компонент связности:" << std::endl;
-    for (size_t i = 0; i < components.size(); ++i) {
+    int size_i = components.size();
+    std::cout << "Найдено " << size_i << " компонент связности:" << std::endl;
+    for (int i = 0; i < size_i; i++) {
         std::cout << "Компонента " << i + 1 << ": ";
-        if (components[i].empty()) std::cout << "(пусто)";
-        else
-            for (size_t j = 0; j < components[i].size(); ++j)
-                std::cout << components[i][j] << (j == components[i].size() - 1 ? "" : " ");
+        bool isEmpty = components[i].empty();
+        if (isEmpty) std::cout << "(пусто)";
+        else {
+          int size_j = components[i].size();
+            for (int j = 0; j < size_j; j++)
+              std::cout << components[i][j] << (j == size_j - 1 ? "" : " ");
+        }
         std::cout << std::endl;
     }
 
